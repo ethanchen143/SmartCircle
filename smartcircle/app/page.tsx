@@ -16,6 +16,8 @@ export interface Connection {
   gender: 'male' | 'female' | 'other';
   location: string;
   profession: string;
+  profileImage?: string;
+  email?: string;
   phoneNumber?: string;
   socials?: {
     instagram?: string;
@@ -65,6 +67,14 @@ export default function Home() {
     setFocusedNodeId(candidateId);
   };
 
+  const handleMarkConnected = (connectionId: string) => {
+    setConnections(connections.map(conn =>
+      conn.id === connectionId
+        ? { ...conn, dateAdded: new Date(), closeness: Math.min(10, conn.closeness + 1) }
+        : conn
+    ));
+  };
+
   const handleAddConnection = (connection: Omit<Connection, 'id' | 'dateAdded'>) => {
     const newConnection: Connection = {
       ...connection,
@@ -95,12 +105,18 @@ export default function Home() {
 
   return (
     <main className="h-screen w-screen overflow-hidden bg-white">
+      {/* Logo/Brand */}
+      <div className="fixed top-6 left-6 z-40">
+        <h1 className="text-2xl font-bold text-indigo-600">SmartCircle</h1>
+      </div>
+
       {/* Results Sidebar */}
       <ResultsSidebar
         results={searchResults}
         connections={connections}
         onClose={handleCloseSidebar}
         onCandidateClick={handleCandidateClick}
+        onMarkConnected={handleMarkConnected}
       />
 
       {/* Network Graph - Full Page */}

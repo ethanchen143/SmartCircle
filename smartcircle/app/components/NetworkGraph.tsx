@@ -124,6 +124,18 @@ export default function NetworkGraph({ connections, onConnectionClick, focusedNo
       return;
     }
 
+    // Store previous node positions to preserve angles
+    const previousPositions = new Map<string, { angle: number; distance: number }>();
+    nodes.forEach(node => {
+      if (node.connection) {
+        const dx = node.x - centerX;
+        const dy = node.y - centerY;
+        const angle = Math.atan2(dy, dx);
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        previousPositions.set(node.id, { angle, distance });
+      }
+    });
+
     // Calculate all distances first to find max
     const connectionsWithDistance = connections.map((conn) => {
       const daysSinceAdded = Math.floor(
@@ -166,10 +178,18 @@ export default function NetworkGraph({ connections, onConnectionClick, focusedNo
       const anglePerNode = (Math.PI * 2) / bucket.length;
 
       bucket.forEach(({ conn }, indexInBucket) => {
-        // Add random noise to angle to prevent perfect alignment
-        const baseAngle = indexInBucket * anglePerNode - Math.PI / 2; // Start from top, go clockwise
-        const angleNoise = (Math.random() - 0.5) * (anglePerNode * 0.3); // +/- 15% of spacing
-        const angle = baseAngle + angleNoise;
+        let angle: number;
+
+        // Check if this node existed before - preserve its angle
+        const prevPos = previousPositions.get(conn.id);
+        if (prevPos) {
+          angle = prevPos.angle;
+        } else {
+          // New node - calculate angle with random noise
+          const baseAngle = indexInBucket * anglePerNode - Math.PI / 2;
+          const angleNoise = (Math.random() - 0.5) * (anglePerNode * 0.3);
+          angle = baseAngle + angleNoise;
+        }
 
         connectionNodes.push({
           id: conn.id,
@@ -348,16 +368,25 @@ export default function NetworkGraph({ connections, onConnectionClick, focusedNo
               <g
                 key={node.id}
                 onMouseEnter={() => {
-                  if (!node.isUser) {
+                  if (!node.isUser && !selectedNode) {
                     setHoveredNode(node);
                   }
                 }}
                 onMouseLeave={() => {
-                  setHoveredNode(null);
+                  if (!selectedNode) {
+                    setHoveredNode(null);
+                  }
                 }}
                 onClick={() => {
                   if (node.connection) {
-                    setSelectedNode(node);
+                    // Toggle selection: if already selected, unselect and clear hover
+                    if (selectedNode?.id === node.id) {
+                      setSelectedNode(null);
+                      setHoveredNode(null);
+                    } else {
+                      setSelectedNode(node);
+                      setHoveredNode(null);
+                    }
                   }
                 }}
                 className="cursor-pointer"
@@ -373,35 +402,23 @@ export default function NetworkGraph({ connections, onConnectionClick, focusedNo
                   strokeWidth={(isHovered || isFocused) ? 3 : 0}
                 />
 
-                {/* Avatar SVG based on gender */}
-                {!node.isUser && node.connection && (() => {
-                  const avatarScale = radius / 45; // Scale avatar proportionally to node size
-                  return (
-                    <g transform={`translate(${node.x}, ${node.y}) scale(${avatarScale})`}>
-                      {node.connection.gender === 'male' && (
-                        // Male avatar
-                        <>
-                          <circle cx="0" cy="-8" r="8" fill="white" opacity="0.9" />
-                          <path d="M -12 15 Q -12 0 0 0 Q 12 0 12 15" fill="white" opacity="0.9" />
-                        </>
-                      )}
-                      {node.connection.gender === 'female' && (
-                        // Female avatar
-                        <>
-                          <circle cx="0" cy="-8" r="8" fill="white" opacity="0.9" />
-                          <path d="M -10 15 Q -10 2 0 2 Q 10 2 10 15 L 8 15 Q 8 5 0 5 Q -8 5 -8 15 Z" fill="white" opacity="0.9" />
-                        </>
-                      )}
-                      {node.connection.gender === 'other' && (
-                        // Neutral avatar
-                        <>
-                          <circle cx="0" cy="-8" r="8" fill="white" opacity="0.9" />
-                          <rect x="-10" y="2" width="20" height="13" rx="2" fill="white" opacity="0.9" />
-                        </>
-                      )}
-                    </g>
-                  );
-                })()}
+                {/* Profile Image */}
+                {!node.isUser && node.connection?.profileImage && (
+                  <clipPath id={`clip-${node.id}`}>
+                    <circle cx={node.x} cy={node.y} r={radius * 0.85} />
+                  </clipPath>
+                )}
+                {!node.isUser && node.connection?.profileImage && (
+                  <image
+                    href={node.connection.profileImage}
+                    x={node.x - radius * 0.85}
+                    y={node.y - radius * 0.85}
+                    width={radius * 1.7}
+                    height={radius * 1.7}
+                    clipPath={`url(#clip-${node.id})`}
+                    preserveAspectRatio="xMidYMid slice"
+                  />
+                )}
 
                 {/* Text label */}
                 {node.isUser && (
@@ -427,99 +444,141 @@ export default function NetworkGraph({ connections, onConnectionClick, focusedNo
       {/* Status box for hovered or selected connection */}
       {(hoveredNode?.connection || selectedNode?.connection) && (
         <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-white rounded-2xl shadow-2xl border border-gray-200 px-8 py-5 max-w-5xl">
-          {/* Close button for selected node */}
-          {selectedNode && (
-            <button
-              onClick={() => setSelectedNode(null)}
-              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M18 6L6 18M6 6l12 12" />
-              </svg>
-            </button>
-          )}
-          {/* Edit pencil button */}
-          {selectedNode && (
-            <button
-              onClick={() => {
-                if (selectedNode.connection) {
-                  onConnectionClick(selectedNode.connection);
-                }
-              }}
-              className="absolute top-3 right-10 text-gray-400 hover:text-indigo-600 transition"
-              title="Edit connection"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-              </svg>
-            </button>
-          )}
           {(() => {
             const displayNode = selectedNode || hoveredNode;
             if (!displayNode?.connection) return null;
 
             return (
               <>
-                {/* First line: Phone, Socials | Name | Age, Location */}
+                {/* First line: Profile Image | Email, Phone | Name | Age, Location, Socials, Edit */}
                 <div className="flex items-center gap-8">
-                  {/* Left side: Phone & Social buttons */}
-                  <div className="flex items-center gap-4">
+                  {/* Profile Image */}
+                  {displayNode.connection.profileImage && (
+                    <img
+                      src={displayNode.connection.profileImage}
+                      alt={displayNode.connection.name}
+                      className="w-16 h-16 rounded-full object-cover flex-shrink-0"
+                    />
+                  )}
+
+                  {/* Left side: Email & Phone */}
+                  <div className="flex flex-col gap-1">
+                    {displayNode.connection.email && (
+                      <a
+                        href={`mailto:${displayNode.connection.email}`}
+                        className="text-sm font-medium text-gray-700 hover:text-indigo-600 transition"
+                      >
+                        {displayNode.connection.email}
+                      </a>
+                    )}
                     {displayNode.connection.phoneNumber && (
                       <div className="text-sm font-medium text-gray-700">
                         {displayNode.connection.phoneNumber}
                       </div>
                     )}
-
-                    {displayNode.connection.socials && (
-                      <div className="flex gap-2">
-                        {displayNode.connection.socials.instagram && (
-                          <a
-                            href={`https://instagram.com/${displayNode.connection.socials.instagram.replace('@', '')}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white hover:opacity-80 transition-opacity"
-                            title="Instagram"
-                          >
-                            <span className="text-xs font-bold">IG</span>
-                          </a>
-                        )}
-                        {displayNode.connection.socials.linkedin && (
-                          <a
-                            href={`https://${displayNode.connection.socials.linkedin}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white hover:opacity-80 transition-opacity"
-                            title="LinkedIn"
-                          >
-                            <span className="text-xs font-bold">in</span>
-                          </a>
-                        )}
-                        {displayNode.connection.socials.twitter && (
-                          <a
-                            href={`https://twitter.com/${displayNode.connection.socials.twitter.replace('@', '')}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="w-8 h-8 bg-sky-500 rounded-lg flex items-center justify-center text-white hover:opacity-80 transition-opacity"
-                            title="Twitter"
-                          >
-                            <span className="text-xs font-bold">𝕏</span>
-                          </a>
-                        )}
-                      </div>
-                    )}
                   </div>
 
-                  {/* Center: Name */}
+                  {/* Center: Name, Profession, Last Connected & Closeness */}
                   <div className="flex-grow text-center">
                     <h2 className="text-3xl font-bold text-gray-900">{displayNode.connection.name}</h2>
+                    <p className="text-sm text-gray-600 mt-1">{displayNode.connection.profession}</p>
+                    <div className="flex items-center justify-center gap-3 mt-2 text-xs text-gray-500">
+                      <div className="flex items-center gap-1">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <circle cx="12" cy="12" r="10" />
+                          <path d="M12 6v6l4 2" />
+                        </svg>
+                        <span>
+                          {(() => {
+                            const daysSince = Math.floor(
+                              (new Date().getTime() - new Date(displayNode.connection.dateAdded).getTime()) / (1000 * 60 * 60 * 24)
+                            );
+                            if (daysSince === 0) return 'Connected today';
+                            if (daysSince === 1) return 'Connected yesterday';
+                            if (daysSince < 7) return `Connected ${daysSince} days ago`;
+                            if (daysSince < 30) return `Connected ${Math.floor(daysSince / 7)} weeks ago`;
+                            if (daysSince < 365) return `Connected ${Math.floor(daysSince / 30)} months ago`;
+                            return `Connected ${Math.floor(daysSince / 365)} years ago`;
+                          })()}
+                        </span>
+                      </div>
+                      <div className="text-gray-400">•</div>
+                      <div className="flex items-center gap-1">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-red-500">
+                          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                        </svg>
+                        <span className="font-medium">Closeness: {displayNode.connection.closeness}/10</span>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Right side: Age & Location */}
+                  {/* Right side: Age, Location, Socials, Edit button */}
                   <div className="flex items-center gap-4 text-sm font-medium text-gray-700">
                     <div>{displayNode.connection.age}</div>
                     <div className="text-gray-400">•</div>
                     <div>{displayNode.connection.location}</div>
+
+                    {displayNode.connection.socials && (
+                      <>
+                        <div className="text-gray-400">•</div>
+                        <div className="flex gap-2">
+                          {displayNode.connection.socials.instagram && (
+                            <a
+                              href={`https://instagram.com/${displayNode.connection.socials.instagram.replace('@', '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white hover:opacity-80 transition-opacity"
+                              title="Instagram"
+                            >
+                              <span className="text-xs font-bold">IG</span>
+                            </a>
+                          )}
+                          {displayNode.connection.socials.linkedin && (
+                            <a
+                              href={`https://${displayNode.connection.socials.linkedin}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white hover:opacity-80 transition-opacity"
+                              title="LinkedIn"
+                            >
+                              <span className="text-xs font-bold">in</span>
+                            </a>
+                          )}
+                          {displayNode.connection.socials.twitter && (
+                            <a
+                              href={`https://twitter.com/${displayNode.connection.socials.twitter.replace('@', '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="w-8 h-8 bg-sky-500 rounded-lg flex items-center justify-center text-white hover:opacity-80 transition-opacity"
+                              title="Twitter"
+                            >
+                              <span className="text-xs font-bold">𝕏</span>
+                            </a>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {selectedNode && (
+                      <>
+                        <div className="text-gray-400">•</div>
+                        <button
+                          onClick={() => {
+                            if (selectedNode.connection) {
+                              onConnectionClick(selectedNode.connection);
+                            }
+                          }}
+                          className="flex items-center gap-1 text-indigo-600 hover:text-indigo-700 transition"
+                          title="Edit connection"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                          </svg>
+                          <span className="text-xs">Edit</span>
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
 

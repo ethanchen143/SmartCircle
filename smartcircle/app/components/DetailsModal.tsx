@@ -21,6 +21,7 @@ export default function DetailsModal({
   const [gender, setGender] = useState<'male' | 'female' | 'other'>(connection.gender);
   const [location, setLocation] = useState(connection.location);
   const [profession, setProfession] = useState(connection.profession);
+  const [email, setEmail] = useState(connection.email || '');
   const [phoneNumber, setPhoneNumber] = useState(connection.phoneNumber || '');
   const [showSocials, setShowSocials] = useState(false);
   const [instagram, setInstagram] = useState(connection.socials?.instagram || '');
@@ -95,6 +96,14 @@ export default function DetailsModal({
             value={profession}
             onChange={(e) => setProfession(e.target.value)}
             placeholder="Profession"
+            className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500 text-gray-900 placeholder-gray-500"
+          />
+
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email (optional)"
             className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500 text-gray-900 placeholder-gray-500"
           />
 
@@ -214,7 +223,7 @@ export default function DetailsModal({
               onClick={() => onResetConnection(connection.id)}
               className="w-full bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700 transition"
             >
-              Reset Connection (Just Connected!)
+              Reset Connection (We Just Connected!)
             </button>
           </div>
         </form>

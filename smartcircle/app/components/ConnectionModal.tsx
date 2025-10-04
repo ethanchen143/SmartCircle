@@ -14,6 +14,7 @@ export default function ConnectionModal({ onClose, onSave }: ConnectionModalProp
   const [gender, setGender] = useState<'male' | 'female' | 'other'>('other');
   const [location, setLocation] = useState('');
   const [profession, setProfession] = useState('');
+  const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [showSocials, setShowSocials] = useState(false);
   const [instagram, setInstagram] = useState('');
@@ -32,6 +33,7 @@ export default function ConnectionModal({ onClose, onSave }: ConnectionModalProp
       gender,
       location,
       profession,
+      email: email || undefined,
       phoneNumber: phoneNumber || undefined,
       socials: {
         instagram: instagram || undefined,
@@ -91,7 +93,7 @@ export default function ConnectionModal({ onClose, onSave }: ConnectionModalProp
             type="text"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            placeholder="Location (e.g., New York)"
+            placeholder="Location"
             required
             className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500 text-gray-900 placeholder-gray-500"
           />
@@ -100,8 +102,16 @@ export default function ConnectionModal({ onClose, onSave }: ConnectionModalProp
             type="text"
             value={profession}
             onChange={(e) => setProfession(e.target.value)}
-            placeholder="Profession (e.g., Dev at OpenAI)"
+            placeholder="Profession"
             required
+            className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500 text-gray-900 placeholder-gray-500"
+          />
+
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email (optional)"
             className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500 text-gray-900 placeholder-gray-500"
           />
 

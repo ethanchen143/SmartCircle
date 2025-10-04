@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { SearchResults, SearchCandidate } from '../types/searchResults';
 import { Connection } from '../page';
 import { X } from 'lucide-react';
@@ -9,9 +10,10 @@ interface ResultsSidebarProps {
   connections: Connection[];
   onClose: () => void;
   onCandidateClick: (candidateId: string) => void;
+  onMarkConnected: (connectionId: string) => void;
 }
 
-export default function ResultsSidebar({ results, connections, onClose, onCandidateClick }: ResultsSidebarProps) {
+export default function ResultsSidebar({ results, connections, onClose, onCandidateClick, onMarkConnected }: ResultsSidebarProps) {
   if (!results) return null;
 
   return (
@@ -47,6 +49,7 @@ export default function ResultsSidebar({ results, connections, onClose, onCandid
               connection={connection}
               rank={index + 1}
               onClick={() => onCandidateClick(candidate.connection_id)}
+              onMarkConnected={onMarkConnected}
             />
           );
         })}
@@ -60,10 +63,23 @@ interface CandidateCardProps {
   connection: Connection;
   rank: number;
   onClick: () => void;
+  onMarkConnected: (connectionId: string) => void;
 }
 
-function CandidateCard({ candidate, connection, rank, onClick }: CandidateCardProps) {
+function CandidateCard({ candidate, connection, rank, onClick, onMarkConnected }: CandidateCardProps) {
   const { reasoning, outreachMessage } = candidate;
+  const [isConnected, setIsConnected] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(outreachMessage);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
 
   return (
     <div
@@ -90,7 +106,33 @@ function CandidateCard({ candidate, connection, rank, onClick }: CandidateCardPr
 
       {/* Outreach Message */}
       <div className="mb-3">
-        <h4 className="text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wide">Suggested Message</h4>
+        <div className="flex items-center justify-between mb-1">
+          <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Suggested Message</h4>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleCopy();
+            }}
+            className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1 transition"
+          >
+            {copied ? (
+              <>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                Copied!
+              </>
+            ) : (
+              <>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
+                Copy
+              </>
+            )}
+          </button>
+        </div>
         <div className="bg-gray-50 rounded p-3 border border-gray-200">
           <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{outreachMessage}</p>
         </div>
@@ -100,16 +142,19 @@ function CandidateCard({ candidate, connection, rank, onClick }: CandidateCardPr
       <button
         onClick={(e) => {
           e.stopPropagation();
-          // Handle reach out action
-          if (connection.phoneNumber) {
-            window.open(`sms:${connection.phoneNumber}&body=${encodeURIComponent(outreachMessage)}`);
-          } else if (connection.socials?.linkedin) {
-            window.open(connection.socials.linkedin, '_blank');
+          if (!isConnected) {
+            onMarkConnected(connection.id);
+            setIsConnected(true);
           }
         }}
-        className="w-full bg-indigo-600 text-white text-sm font-medium py-2 px-4 rounded-lg hover:bg-indigo-700 transition"
+        className={`w-full text-white text-sm font-medium py-2 px-4 rounded-lg transition ${
+          isConnected
+            ? 'bg-gray-400 cursor-not-allowed'
+            : 'bg-green-600 hover:bg-green-700'
+        }`}
+        disabled={isConnected}
       >
-        Reach Out
+        {isConnected ? 'Connected ✓' : 'Mark as Connected'}
       </button>
     </div>
   );
